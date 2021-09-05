@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:aop="http://www.springframework.org/schema/aop"
+       xmlns:tx="http://www.springframework.org/schema/tx"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+                           http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd
+                           http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx.xsd
+                           http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop.xsd">
+
+
+    <!--上下文扫描，base-package：扫描的包-->
+    <context:component-scan base-package="com.meng">
+        <!--这个标签标示扫描的时候 exclude（过滤掉）什么注解（Controller）-->
+        <context:exclude-filter type="annotation" expression="org.springframework.stereotype.Controller"/>
+    </context:component-scan>
+
+    <!--引入外部文件 context:property-placeholder-->
+    <context:property-placeholder location="classpath:dbconfig.properties"></context:property-placeholder>
+
+    <!--创建数据源 ComboPooledDataSource-->
+    <bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+        <property name="user" value="${jdbc.user}"></property>
+        <property name="password" value="${jdbc.password}"></property>
+        <property name="driverClass" value="${jdbc.driverClass}"></property>
+        <property name="jdbcUrl" value="${jdbc.jdbcUrl}"></property>
+        <property name="minPoolSize" value="${jdbc.minPoolSize}"></property>
+        <property name="maxPoolSize" value="${jdbc.maxPoolSize}"></property>
+    </bean>
+
+    <!--
+    在 MyBatis 中，使用 SqlSessionFactoryBuilder创建SqlSessionFactory ，
+    进而来创建 SqlSession。一旦你获得一个 session 之后,你可以使用它来执行映
+    射语句,提交或回滚连接,最后,当不再需要它的时候, 你可以关闭 session。
+
+    使用 MyBatis-Spring 之后, 会使用SqlSessionFactoryBean来代替
+    SqlSessionFactoryBuilder创建SqlSessionFactory，然后可以使用下面两种方式使用sqlSession。
+
+    1、SqlSessionTemplate：
+
+    Mybatis-Spring提供了一种直接使用SqlSession的方式
+    （一个实现了SqlSession接口的SqlSessionTemplate实现类）
+
+-->
+    <!--mybatis与spring整合
+        第一步：SqlSessionFactoryBean与mybatis中的SQLSessionFactoryBean的功能一样都是创建出SQLSessionFactory
+     -->
+    <bean id="sessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+        <property name="configLocation" value="classpath:mybatis-config.xml"></property>
+        <property name="dataSource" ref="dataSource"></property>
+        <property name="mapperLocations" value="classpath:mapper/*.xml"></property>
+    </bean>
+    <!--在mybatis中会将dao包中的接口创建出代理实现类，这里就是将这个创建出来的实现类
+        加入到IOC容器中，让Spring自动调用
+        -->
+    <bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+        <!--MapperScannerConfigure提供了String类型的sqlSessionFactoryBeanName，
+            通过<property name="sqlSessionFactoryBeanName" value="sqlSessionFactory" />，
+            这样先将bean name注入到sqlSessionFactoryBeanName，等到spring初始化完成后，
+            再通过bean name构建sqlSessionFactory。
+        -->
+        <property name="sqlSessionFactoryBeanName" value="sessionFactory"></property>
+        <!--扫描的包-->
+        <property name="basePackage" value="com.meng.dao"></property>
+    </bean>
+    <!--
+        SQLSessionTemplate 类就是来创建sqlSession的
+        第二步：根据上面创建出来的sqlSessionFactory 来创建sqlSession
+    -->
+    <bean id="sqlSession" class="org.mybatis.spring.SqlSessionTemplate">
+        <!--SqlSessionTemplate 给构造器配置参数-->
+        <constructor-arg name="sqlSessionFactory" ref="sessionFactory"></constructor-arg>
+        <!---->
+        <constructor-arg name="executorType" value="BATCH"></constructor-arg>
+    </bean>
+
+    <!--事务管理-->
+    <bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+        <!--指定管理的数据源-->
+        <property name="dataSource" ref="dataSource"></property>
+    </bean>
+
+    <!--对上面的事务管理进行增强-->
+    <!--配置事务通知-->
+    <tx:advice id="txAdvice" transaction-manager="transactionManager">
+        <!--给指定的方法进行事务管理-->
+        <tx:attributes>
+            <tx:method name="*"/>
+            <tx:method name="get*" read-only="true"/>
+        </tx:attributes>
+    </tx:advice>
+
+    <!--运用面向切面技术 进行事务增强
+        切面(advice)，增强(advisor)，切入点(PointCut)
+    -->
+
+    <aop:config>
+        <!--配置切入点-->
+        <aop:pointcut id="tx" expression="execution(* com.meng.service.*.*(..))"/>
+        <!--对上面自定的切面进行增强-->
+        <aop:advisor advice-ref="txAdvice" pointcut-ref="tx"></aop:advisor>
+    </aop:config>
+
+</beans>

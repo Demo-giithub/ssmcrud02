@@ -1,0 +1,5 @@
+com\meng\bean\Msg.class
+com\meng\controller\DepartmentController.class
+com\meng\service\EmployeeService.class
+com\meng\service\DepartmentService.class
+com\meng\controller\EmployeeController.class
